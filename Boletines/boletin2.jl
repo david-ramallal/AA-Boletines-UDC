@@ -16,9 +16,10 @@ function oneHotEncoding(feature::AbstractArray{<:Any,1},classes::AbstractArray{<
     return rtn;  
 end
 
+oneHotEncoding(feature::AbstractArray{<:Any,1}) = oneHotEncoding(feature, unique(feature));
 
 #Cargamos la base de datos.
-dataset = readdlm("iris.data",',');
+dataset = readdlm("Boletines/iris.data",',');
 
 #Separamos las entradas y las salidas deseadas.
 inputs = dataset[:,1:4];
@@ -27,7 +28,7 @@ targets = dataset[:,5];
 #Convertimos los datos de entrada de Array{Any,2} a Array{Float32,2}.
 inputs = Float32.(inputs);          #inputs = convert(Array{Float32,2},inputs); 
 
-targets = oneHotEncoding(targets, unique(targets));
+targets = oneHotEncoding(targets);
 
 @assert (size(inputs,1)==size(targets,1)) "Las matrices de entradas y salidas deseadas no tienen el mismo número de filas";
 
