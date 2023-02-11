@@ -18,6 +18,8 @@ end
 
 oneHotEncoding(feature::AbstractArray{<:Any,1}) = oneHotEncoding(feature, unique(feature));
 
+oneHotEncoding(feature::AbstractArray{Bool,1}) = reshape(feature, length(feature), 1);
+
 #Cargamos la base de datos.
 dataset = readdlm("Boletines/iris.data",',');
 
