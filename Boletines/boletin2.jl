@@ -20,6 +20,18 @@ oneHotEncoding(feature::AbstractArray{<:Any,1}) = oneHotEncoding(feature, unique
 
 oneHotEncoding(feature::AbstractArray{Bool,1}) = reshape(feature, length(feature), 1);
 
+function calculateMinMaxNormalizationParameters(dataset::AbstractArray{<:Real,2})
+    minimo = minimum(dataset, dims=1);
+    maximo = maximum(dataset, dims=1);
+    return [tuple(i) for i in zip(minimo[1,:], maximo[1,:])];
+end
+
+function calculateZeroMeanNormalizationParameters(dataset::AbstractArray{<:Real,2})
+    media = mean(dataset, dims=1);
+    desviacion_tipica = std(dataset, dims=1);
+    return [tuple(i) for i in zip(media[1,:], desviacion_tipica[1,:])];
+end
+
 #Cargamos la base de datos.
 dataset = readdlm("Boletines/iris.data",',');
 
@@ -34,9 +46,9 @@ targets = oneHotEncoding(targets);
 
 @assert (size(inputs,1)==size(targets,1)) "Las matrices de entradas y salidas deseadas no tienen el mismo número de filas";
 
-#Obtenemos matrices de una fila y tantas columnas como atributos.
-minimo = minimum(inputs, dims=1);
-maximo = maximum(inputs, dims=1);
+#Obtenemos maximos, minimos, medias y desviaciones tipicas.
+#minmax = calculateMinMaxNormalizationParameters(inputs);
+meanStdDesv = calculateZeroMeanNormalizationParameters(inputs);
 media = mean(inputs, dims=1);
 desviacion_tipica = std(inputs, dims=1);
 
