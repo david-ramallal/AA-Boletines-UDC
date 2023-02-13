@@ -33,6 +33,29 @@ function calculateZeroMeanNormalizationParameters(dataset::AbstractArray{<:Real,
     return (media,desviacion_tipica);
 end
 
+function normalizeMinMax!(dataset::AbstractArray{<:Real,2}, normalizationParameters::NTuple{2, AbstractArray{<:Real,2}})
+    num_columns = length(normalizationParameters);
+    for i in 1:num_columns
+        if normalizationParameters[1][i] == normalizationParameters[2][1]
+            dataset[:,i] .= 0;
+        else
+            dataset .-= normalizationParameters[1];
+            dataset ./= (normalizationParameters[2] - normalizationParameters[1]);
+        end
+    end
+end
+
+normalizeMinMax!(dataset::AbstractArray{<:Real,2}) = normalizeMinMax!(dataset, calculateMinMaxNormalizationParameters(dataset));
+
+function normalizeMinMax(dataset::AbstractArray{<:Real,2}, normalizationParameters::NTuple{2, AbstractArray{<:Real,2}})
+    copied = copy(dataset);
+    normalizeMinMax!(copied, normalizationParameters);
+    return copied;
+end
+
+normalizeMinMax(dataset::AbstractArray{<:Real,2}) = normalizeMinMax(dataset, calculateMinMaxNormalizationParameters(dataset));
+
+
 #Cargamos la base de datos.
 dataset = readdlm("Boletines/iris.data",',');
 
