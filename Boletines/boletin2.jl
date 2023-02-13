@@ -4,13 +4,14 @@ using Flux: params
 #feature -> vector con los valores de un atributo o salida deseada para cada patron
 #classes -> valores de las categorias
 function oneHotEncoding(feature::AbstractArray{<:Any,1},classes::AbstractArray{<:Any,1})
-    if(length(classes) == 2)
-        rtn = (feature .== classes[1]);
+    unique_classes = unique(classes);
+    if(length(unique_classes) == 2)
+        rtn = (feature .== unique_classes[1]);
         rtn = reshape(rtn, (length(rtn), 1));
     else
-        rtn = zeros(length(feature), length(classes));
-        for i in classes
-            rtn[:, findfirst(classes .== i)] = (feature .== i);
+        rtn = zeros(length(feature), length(unique_classes));
+        for i in unique_classes
+            rtn[:, findfirst(unique_classes .== i)] = (feature .== i);
         end
     end
     return rtn;  
@@ -23,13 +24,13 @@ oneHotEncoding(feature::AbstractArray{Bool,1}) = reshape(feature, length(feature
 function calculateMinMaxNormalizationParameters(dataset::AbstractArray{<:Real,2})
     minimo = minimum(dataset, dims=1);
     maximo = maximum(dataset, dims=1);
-    return [tuple(i) for i in zip(minimo[1,:], maximo[1,:])];
+    return (minimo,maximo);
 end
 
 function calculateZeroMeanNormalizationParameters(dataset::AbstractArray{<:Real,2})
     media = mean(dataset, dims=1);
     desviacion_tipica = std(dataset, dims=1);
-    return [tuple(i) for i in zip(media[1,:], desviacion_tipica[1,:])];
+    return (media,desviacion_tipica);
 end
 
 #Cargamos la base de datos.
@@ -49,16 +50,14 @@ targets = oneHotEncoding(targets);
 #Obtenemos maximos, minimos, medias y desviaciones tipicas.
 #minmax = calculateMinMaxNormalizationParameters(inputs);
 meanStdDesv = calculateZeroMeanNormalizationParameters(inputs);
-media = mean(inputs, dims=1);
-desviacion_tipica = std(inputs, dims=1);
 
 #Normalizamos los datos de entrada (si un atributo tiene desviacion tipica = 0 le asignamos 0 como valor constante)
-num_columns = length(desviacion_tipica);
+num_columns = length(meanStdDesv);
 for i in 1:num_columns
-    if desviacion_tipica[i] == 0
+    if meanStdDesv[2][i] == 0
         inputs[:,i] .= 0
     else
-        inputs[:,i] = (inputs[:,i] .- media[i]) ./ desviacion_tipica[i];
+        inputs[:,i] = (inputs[:,i] .- meanStdDesv[1][i]) ./ meanStdDesv[2][i];
     end
 end
 
