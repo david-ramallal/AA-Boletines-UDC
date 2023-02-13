@@ -77,6 +77,18 @@ end
 
 normalizeZeroMean(dataset::AbstractArray{<:Real,2}) = normalizeZeroMean(dataset, calculateZeroMeanNormalizationParameters(dataset));
 
+function classifyOutputs(outputs::AbstractArray{<:Real,2}; threshold::Real=0.5)
+    num_columns = size(outputs,2);
+    if(num_columns == 1)
+        outputs = (outputs .>= threshold);
+    else
+        (_, indicesMaxEachInstance) = findmax(outputs, dims=2);
+        outputs = falses(size(outputs));
+        outputs[indicesMaxEachInstance] .= true;
+    end
+    return outputs;
+end
+
 #Cargamos la base de datos.
 dataset = readdlm("Boletines/iris.data",',');
 
