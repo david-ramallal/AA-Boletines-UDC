@@ -56,6 +56,27 @@ end
 normalizeMinMax(dataset::AbstractArray{<:Real,2}) = normalizeMinMax(dataset, calculateMinMaxNormalizationParameters(dataset));
 
 
+function normalizeZeroMean!(dataset::AbstractArray{<:Real,2}, normalizationParameters::NTuple{2, AbstractArray{<:Real,2}})
+    num_columns = length(normalizationParameters);
+    for i in 1:num_columns
+        if normalizationParameters[2][i] == 0
+            dataset[:,i] .= 0;
+        else
+            dataset[:,i] = (dataset[:,i] .- normalizationParameters[1][i]) ./ normalizationParameters[2][i];
+        end
+    end
+end
+
+normalizeZeroMean!(dataset::AbstractArray{<:Real,2}) = normalizeZeroMean!(dataset, calculateZeroMeanNormalizationParameters(dataset));
+
+function normalizeZeroMean(dataset::AbstractArray{<:Real,2}, normalizationParameters::NTuple{2, AbstractArray{<:Real,2}})
+    copied = copy(dataset);
+    normalizeZeroMean!(copied, normalizationParameters);
+    return copied;
+end
+
+normalizeZeroMean(dataset::AbstractArray{<:Real,2}) = normalizeZeroMean(dataset, calculateZeroMeanNormalizationParameters(dataset));
+
 #Cargamos la base de datos.
 dataset = readdlm("Boletines/iris.data",',');
 
@@ -70,19 +91,8 @@ targets = oneHotEncoding(targets);
 
 @assert (size(inputs,1)==size(targets,1)) "Las matrices de entradas y salidas deseadas no tienen el mismo número de filas";
 
-#Obtenemos maximos, minimos, medias y desviaciones tipicas.
-#minmax = calculateMinMaxNormalizationParameters(inputs);
-meanStdDesv = calculateZeroMeanNormalizationParameters(inputs);
-
 #Normalizamos los datos de entrada (si un atributo tiene desviacion tipica = 0 le asignamos 0 como valor constante)
-num_columns = length(meanStdDesv);
-for i in 1:num_columns
-    if meanStdDesv[2][i] == 0
-        inputs[:,i] .= 0
-    else
-        inputs[:,i] = (inputs[:,i] .- meanStdDesv[1][i]) ./ meanStdDesv[2][i];
-    end
-end
+normalizeZeroMean!(inputs);
 
 #Creamos una RNA con una capa oculta
 ann = Chain(
