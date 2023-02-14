@@ -116,6 +116,27 @@ function accuracy(outputs::AbstractArray{<:Real,2}, targets::AbstractArray{Bool,
     end
 end
 
+
+function buildClassANN(numInputs::Int, topology::AbstractArray{<:Int,1}, numOutputs::Int;
+    transferFunctions::AbstractArray{<:Function,1}=fill(σ, length(topology))) 
+
+    ann = Chain();
+    numInputsLayer = numInputs;
+    for numOutputsLayer = topology
+        ann = Chain(ann..., Dense(numInputsLayer, numOutputsLayer,  σ));
+        numInputsLayer = numOutputsLayer;
+    end
+    if (numOutputs == 1)
+        ann = Chain(ann..., Dense(numInputsLayer, 1, σ));
+    else
+        ann = Chain(ann..., Dense(numInputsLayer, numOutputs, identity));
+        ann = Chain(ann..., softmax);
+    end
+    return ann;
+end
+
+
+
 #Cargamos la base de datos.
 dataset = readdlm("Boletines/iris.data",',');
 
