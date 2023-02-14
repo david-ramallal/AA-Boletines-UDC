@@ -89,6 +89,33 @@ function classifyOutputs(outputs::AbstractArray{<:Real,2}; threshold::Real=0.5)
     return outputs;
 end
 
+
+accuracy(outputs::AbstractArray{Bool,1}, targets::AbstractArray{Bool,1}) = mean((outputs .== targets));
+
+function accuracy(outputs::AbstractArray{Bool,2}, targets::AbstractArray{Bool,2}) 
+    if((size(outputs,2) == 1) && (size(targets,2) == 1))
+        accuracy(outputs[:,1], targets[:,1]);
+    elseif((size(outputs,2) > 2) && (size(targets,2) > 2))
+        classComparison = targets .== outputs;
+        correctClassifications = all(classComparison, dims=2);
+        return mean(correctClassifications);
+    end
+end
+
+function accuracy(outputs::AbstractArray{<:Real,1}, targets::AbstractArray{Bool,1}; threshold::Real=0.5) 
+    outputs = (outputs .>= threshold);
+    accuracy(outputs,targets);
+end
+
+function accuracy(outputs::AbstractArray{<:Real,2}, targets::AbstractArray{Bool,2}; threshold::Real=0.5) 
+    if((size(outputs,2) == 1) && (size(targets,2) == 1))
+        accuracy(targets[:, 1], outputs[:, 1]);
+    elseif((size(outputs,2) > 2) && (size(targets,2) > 2)) 
+        outputs = classifyOutputs(outputs);
+        accuracy(targets, outputs);
+    end
+end
+
 #Cargamos la base de datos.
 dataset = readdlm("Boletines/iris.data",',');
 
