@@ -155,18 +155,21 @@ function trainClassANN(topology::AbstractArray{<:Int,1},
     loss(x,y) = (size(y,1) == 1) ? Losses.binarycrossentropy(ann(x),y) : Losses.crossentropy(ann(x),y);
 
     #Vector con los valores de loss en cada ciclo de entrenamiento
-    lossValues = Float32[];
+    lossValues = zeros(Float32, maxEpochs)
+    lossValues[1] = loss(inputs',targets');
 
-    currentEpoch = 0;
+    currentEpoch = 1;
     
     while (currentEpoch < maxEpochs)
 
         #Entrenamos un ciclo la RNA
         Flux.train!(loss, params(ann), [(inputs', targets')], ADAM(learningRate));
 
+        lossValues[currentEpoch+1] = loss(inputs',targets');
+
         currentEpoch += 1;
     end
-
+    return (ann, lossValues);
 end
 
 
@@ -202,6 +205,7 @@ inputs = Float32.(inputs);          #inputs = convert(Array{Float32,2},inputs);
 #targets = convert(AbstractArray{Any,1}, targets);
 
 targets = oneHotEncoding(targets);
+targets = Bool.(targets);
 
 @assert (size(inputs,1)==size(targets,1)) "Las matrices de entradas y salidas deseadas no tienen el mismo número de filas";
 
@@ -209,5 +213,10 @@ targets = oneHotEncoding(targets);
 normalizeZeroMean!(inputs);
 
 #Creamos y entrenamos la RNA
-targets = Bool.(targets);
-trainClassANN(topology, (inputs, targets), maxEpochs = maxEpochs, learningRate = learningRate);
+(trainedANN, lossValues) = trainClassANN(topology, (inputs, targets), maxEpochs = maxEpochs, learningRate = learningRate);
+
+#Obtenemos las salidas utilizando la RNA entrenada
+outputs = trainedANN(inputs');
+outputs = outputs';
+
+accuracySet = accuracy(outputs, targets);
