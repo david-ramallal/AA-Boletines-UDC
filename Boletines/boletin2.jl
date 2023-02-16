@@ -108,6 +108,7 @@ function accuracy(outputs::AbstractArray{<:Real,1}, targets::AbstractArray{Bool,
 end
 
 function accuracy(outputs::AbstractArray{<:Real,2}, targets::AbstractArray{Bool,2}; threshold::Real=0.5) 
+    outputs = (outputs .>= threshold);
     if((size(outputs,2) == 1) && (size(targets,2) == 1))
         accuracy(targets[:, 1], outputs[:, 1]);
     elseif((size(outputs,2) > 2) && (size(targets,2) > 2)) 
@@ -122,9 +123,11 @@ function buildClassANN(numInputs::Int, topology::AbstractArray{<:Int,1}, numOutp
 
     ann = Chain();
     numInputsLayer = numInputs;
+    iteration = 1;
     for numOutputsLayer = topology
-        ann = Chain(ann..., Dense(numInputsLayer, numOutputsLayer,  σ));
+        ann = Chain(ann..., Dense(numInputsLayer, numOutputsLayer,  transferFunctions[iteration]));
         numInputsLayer = numOutputsLayer;
+        iteration += 1;
     end
     if (numOutputs == 1)
         ann = Chain(ann..., Dense(numInputsLayer, 1, σ));
@@ -136,6 +139,56 @@ function buildClassANN(numInputs::Int, topology::AbstractArray{<:Int,1}, numOutp
 end
 
 
+function trainClassANN(topology::AbstractArray{<:Int,1}, 
+    dataset::Tuple{AbstractArray{<:Real,2}, AbstractArray{Bool,2}}; 
+    transferFunctions::AbstractArray{<:Function,1}=fill(σ, length(topology)), 
+    maxEpochs::Int=1000, minLoss::Real=0.0, learningRate::Real=0.01) 
+
+    inputs = dataset[1];
+    outputs = dataset[2];
+
+    ann = buildClassANN(size(inputs,2), topology, size(outputs,2); transferFunctions);
+
+    #Creamos la funcion "loss" para entrenar la RNA
+    #Dependiendo de si hay 2 clases o más de 2 usamos una función u otra
+    #El primer argumento son las salidas del modelo y el segundo las salidas deseadas
+    loss(x,y) = (size(y,1) == 1) ? Losses.binarycrossentropy(ann(x),y) : Losses.crossentropy(ann(x),y);
+
+    #Vector con los valores de loss en cada ciclo de entrenamiento
+    lossValues = Float32[];
+
+    currentEpoch = 0;
+    
+    while (currentEpoch < maxEpochs)
+
+        #Entrenamos un ciclo la RNA
+        Flux.train!(loss, params(ann), [(inputs', targets')], ADAM(learningRate));
+
+        currentEpoch += 1;
+    end
+
+end
+
+
+
+function trainClassANN(topology::AbstractArray{<:Int,1}, 
+    (inputs, targets)::Tuple{AbstractArray{<:Real,2}, AbstractArray{Bool,1}}; 
+    transferFunctions::AbstractArray{<:Function,1}=fill(σ, length(topology)), 
+    maxEpochs::Int=1000, minLoss::Real=0.0, learningRate::Real=0.01)
+
+    trainClassANN(topology, (inputs, reshape(targets, (:,1))) , transferFunctions = transferFunctions, maxEpochs = maxEpochs, minLoss = minLoss, learningRate = learningRate);
+
+end
+
+#Establecemos el learningRate
+#Suele tomar valores entre 0.001 y 0.1
+learningRate = 0.01;
+
+#Creamos una topología con una capa oculta de 5 neuronas
+topology = [5];
+
+#Establecemos el número máximo de ciclos a entrenar
+maxEpochs = 100;
 
 #Cargamos la base de datos.
 dataset = readdlm("Boletines/iris.data",',');
@@ -146,6 +199,7 @@ targets = dataset[:,5];
 
 #Convertimos los datos de entrada de Array{Any,2} a Array{Float32,2}.
 inputs = Float32.(inputs);          #inputs = convert(Array{Float32,2},inputs); 
+#targets = convert(AbstractArray{Any,1}, targets);
 
 targets = oneHotEncoding(targets);
 
@@ -154,24 +208,6 @@ targets = oneHotEncoding(targets);
 #Normalizamos los datos de entrada (si un atributo tiene desviacion tipica = 0 le asignamos 0 como valor constante)
 normalizeZeroMean!(inputs);
 
-#Creamos una RNA con una capa oculta
-ann = Chain(
-    Dense(size(inputs,2),5,σ),
-    Dense(5,size(targets,2), identity),
-    softmax);
-
-#Obtenemos las salidas (hace falta trasponer la matriz de inputs)
-#La RNA no está entrenada, pero lo hacemos para verificar que ha sido creada correctamente
-outputs = ann(inputs');
-
-#Creamos la funcion "loss" para entrenar la RNA
-#Dependiendo de si hay 2 clases o más de 2 usamos una función u otra
-#El primer argumento son las salidas del modelo y el segundo las salidas deseadas
-loss(x,y) = (size(y,1) == 1) ? Losses.binarycrossentropy(ann(x),y) : Losses.crossentropy(ann(x),y);
-
-#Establecemos el learningRate
-#Suele tomar valores entre 0.001 y 0.1
-learningRate = 0.01;
-
-#Entrenamos un ciclo la RNA
-Flux.train!(loss, params(ann), [(inputs', targets')], ADAM(learningRate));
+#Creamos y entrenamos la RNA
+targets = Bool.(targets);
+trainClassANN(topology, (inputs, targets), maxEpochs = maxEpochs, learningRate = learningRate);
