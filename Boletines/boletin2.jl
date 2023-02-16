@@ -191,7 +191,7 @@ learningRate = 0.01;
 topology = [5];
 
 #Establecemos el número máximo de ciclos a entrenar
-maxEpochs = 100;
+maxEpochs = 1000;
 
 #Cargamos la base de datos.
 dataset = readdlm("Boletines/iris.data",',');
@@ -220,3 +220,29 @@ outputs = trainedANN(inputs');
 outputs = outputs';
 
 accuracySet = accuracy(outputs, targets);
+
+#= 
+Precisión CON normalizacion y los siguientes valores:
+    learningRate = 0.01;
+    topology = [5];
+    maxEpochs = 100;
+accuracySet = 0.85 
+
+Precisión SIN normalizacion y los siguientes valores:
+    learningRate = 0.01;
+    topology = [5];
+    maxEpochs = 100;
+accuracySet = 0.94
+
+Precisión CON normalizacion y los siguientes valores:
+    learningRate = 0.01;
+    topology = [5];
+    maxEpochs = 1000;
+accuracySet = 0.96 
+
+Precisión SIN normalizacion y los siguientes valores:
+    learningRate = 0.01;
+    topology = [5];
+    maxEpochs = 1000;
+accuracySet = 0.98 
+=#
