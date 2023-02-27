@@ -1,4 +1,4 @@
-using DelimitedFiles, Statistics, Flux, Flux.Losses
+using DelimitedFiles, Statistics, Random, Flux, Flux.Losses
 using Flux: params
 
 #feature -> vector con los valores de un atributo o salida deseada para cada patron
@@ -173,14 +173,25 @@ function trainClassANN(topology::AbstractArray{<:Int,1},
 end
 
 
-
 function trainClassANN(topology::AbstractArray{<:Int,1}, 
     (inputs, targets)::Tuple{AbstractArray{<:Real,2}, AbstractArray{Bool,1}}; 
     transferFunctions::AbstractArray{<:Function,1}=fill(σ, length(topology)), 
     maxEpochs::Int=1000, minLoss::Real=0.0, learningRate::Real=0.01)
 
     trainClassANN(topology, (inputs, reshape(targets, (:,1))) , transferFunctions = transferFunctions, maxEpochs = maxEpochs, minLoss = minLoss, learningRate = learningRate);
+end
 
+
+function holdOut(N::Int, P::Real)
+    #Vector permutado de tamaño N
+    randomVector = randperm(N);
+
+    #número de patrones para el conjunto de test
+    testPatterns = round(Int, N*P);
+
+    testIndexes = randomVector[1:testPatterns];
+    trainIndexes = randomVector[(testPatterns+ 1):end];
+    return (trainIndexes, testIndexes);
 end
 
 #Establecemos el learningRate
