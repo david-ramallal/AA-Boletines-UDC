@@ -139,13 +139,49 @@ function buildClassANN(numInputs::Int, topology::AbstractArray{<:Int,1}, numOutp
 end
 
 
-function trainClassANN(topology::AbstractArray{<:Int,1}, 
-    dataset::Tuple{AbstractArray{<:Real,2}, AbstractArray{Bool,2}}; 
-    transferFunctions::AbstractArray{<:Function,1}=fill(σ, length(topology)), 
-    maxEpochs::Int=1000, minLoss::Real=0.0, learningRate::Real=0.01) 
+function holdOut(N::Int, P::Real)
+    #Vector permutado de tamaño N
+    randomVector = randperm(N);
 
-    inputs = dataset[1];
-    outputs = dataset[2];
+    #Número de patrones para el conjunto de test
+    testPatterns = round(Int, N*P);
+
+    testIndexes = randomVector[1:testPatterns];
+    trainIndexes = randomVector[(testPatterns+ 1):end];
+    return (trainIndexes, testIndexes);
+end
+
+
+function holdOut(N::Int, Pval::Real, Ptest::Real)
+    #Vector permutado de tamaño N
+    randomVector = randperm(N);
+
+    #Número de patrones para los conjuntos de validación y test
+    valPatterns = round(Int, N*Pval);
+    testPatterns = round(Int, N*Ptest);
+    
+    testIndexes = randomVector[1:testPatterns];
+    validationIndexes = randomVector[testPatterns+1:testPatterns+valPatterns]
+    trainIndexes = randomVector[testPatterns+valPatterns+1:end];
+
+    return(trainIndexes, validationIndexes, testIndexes);
+end
+
+
+
+function trainClassANN(topology::AbstractArray{<:Int,1}, 
+    trainingDataset::Tuple{AbstractArray{<:Real,2}, AbstractArray{Bool,2}}; 
+    validationDataset::Tuple{AbstractArray{<:Real,2}, AbstractArray{Bool,2}}= 
+    (Array{eltype(trainingDataset[1]),2}(undef,0,0), falses(0,0)), 
+    testDataset:: Tuple{AbstractArray{<:Real,2}, AbstractArray{Bool,2}}= 
+    (Array{eltype(trainingDataset[1]),2}(undef,0,0), falses(0,0)), 
+    transferFunctions::AbstractArray{<:Function,1}=fill(σ, length(topology)), 
+    maxEpochs::Int=1000, minLoss::Real=0.0, learningRate::Real=0.01, 
+    maxEpochsVal::Int=20, showText::Bool=false)
+
+
+    inputs = trainingDataset[1];
+    outputs = trainingDataset[2];
 
     ann = buildClassANN(size(inputs,2), topology, size(outputs,2); transferFunctions);
 
@@ -174,40 +210,22 @@ end
 
 
 function trainClassANN(topology::AbstractArray{<:Int,1}, 
-    (inputs, targets)::Tuple{AbstractArray{<:Real,2}, AbstractArray{Bool,1}}; 
+    trainingDataset::Tuple{AbstractArray{<:Real,2}, AbstractArray{Bool,1}}; 
+    validationDataset::Tuple{AbstractArray{<:Real,2}, AbstractArray{Bool,1}}= 
+    (Array{eltype(trainingDataset[1]),1}(undef,0,0), falses(0)), 
+    testDataset::Tuple{AbstractArray{<:Real,2}, AbstractArray{Bool,1}}= 
+    (Array{eltype(trainingDataset[1]),1}(undef,0,0), falses(0)), 
     transferFunctions::AbstractArray{<:Function,1}=fill(σ, length(topology)), 
-    maxEpochs::Int=1000, minLoss::Real=0.0, learningRate::Real=0.01)
-
-    trainClassANN(topology, (inputs, reshape(targets, (:,1))) , transferFunctions = transferFunctions, maxEpochs = maxEpochs, minLoss = minLoss, learningRate = learningRate);
-end
+    maxEpochs::Int=1000, minLoss::Real=0.0, learningRate::Real=0.01, 
+    maxEpochsVal::Int=20, showText::Bool=false) 
 
 
-function holdOut(N::Int, P::Real)
-    #Vector permutado de tamaño N
-    randomVector = randperm(N);
+    trainClassANN(topology, (trainingDataset[1], reshape(trainingDataset[2], 1)), 
+    validationDataset = (validationDataset[1], reshape(validationDataset[2], 1)), 
+    testDataset = (testDataset[1], reshape(testDataset[2], 1)),
+    transferFunctions = transferFunctions, maxEpochs = maxEpochs, minLoss = minLoss, 
+    learningRate = learningRate, maxEpochsVal = maxEpochsVal, showText = showText);
 
-    #Número de patrones para el conjunto de test
-    testPatterns = round(Int, N*P);
-
-    testIndexes = randomVector[1:testPatterns];
-    trainIndexes = randomVector[(testPatterns+ 1):end];
-    return (trainIndexes, testIndexes);
-end
-
-
-function holdOut(N::Int, Pval::Real, Ptest::Real)
-    #Vector permutado de tamaño N
-    randomVector = randperm(N);
-
-    #Número de patrones para los conjuntos de validación y test
-    valPatterns = round(Int, N*Pval);
-    testPatterns = round(Int, N*Ptest);
-    
-    testIndexes = randomVector[1:testPatterns];
-    validationIndexes = randomVector[testPatterns+1:testPatterns+valPatterns]
-    trainIndexes = randomVector[testPatterns+valPatterns+1:end];
-
-    return(trainIndexes, validationIndexes, testIndexes);
 end
 
 
