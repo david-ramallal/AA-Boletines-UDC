@@ -186,13 +186,30 @@ function holdOut(N::Int, P::Real)
     #Vector permutado de tamaño N
     randomVector = randperm(N);
 
-    #número de patrones para el conjunto de test
+    #Número de patrones para el conjunto de test
     testPatterns = round(Int, N*P);
 
     testIndexes = randomVector[1:testPatterns];
     trainIndexes = randomVector[(testPatterns+ 1):end];
     return (trainIndexes, testIndexes);
 end
+
+
+function holdOut(N::Int, Pval::Real, Ptest::Real)
+    #Vector permutado de tamaño N
+    randomVector = randperm(N);
+
+    #Número de patrones para los conjuntos de validación y test
+    valPatterns = round(Int, N*Pval);
+    testPatterns = round(Int, N*Ptest);
+    
+    testIndexes = randomVector[1:testPatterns];
+    validationIndexes = randomVector[testPatterns+1:testPatterns+valPatterns]
+    trainIndexes = randomVector[testPatterns+valPatterns+1:end];
+
+    return(trainIndexes, validationIndexes, testIndexes);
+end
+
 
 #Establecemos el learningRate
 #Suele tomar valores entre 0.001 y 0.1
