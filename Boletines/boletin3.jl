@@ -296,10 +296,9 @@ function trainClassANN(topology::AbstractArray{<:Int,1},
 
 end
 
-
-#Establecemos el learningRate
-#Suele tomar valores entre 0.001 y 0.1
-learningRate = 0.01;
+#Establecemos los ratios de validacion y test
+validationRatio = 0.2;
+testRatio = 0.2;
 
 #Creamos una topología con una capa oculta de 5 neuronas
 topology = [5];
@@ -322,15 +321,48 @@ targets = Bool.(targets);
 
 @assert (size(inputs,1)==size(targets,1)) "Las matrices de entradas y salidas deseadas no tienen el mismo número de filas";
 
-#Normalizamos los datos de entrada (si un atributo tiene desviacion tipica = 0 le asignamos 0 como valor constante)
-normalizeZeroMean!(inputs);
+#Dividimos el dataset en entrenamiento, validación y test
+(trainIndexes, validationIndexes, testIndexes) = holdOut(size(inputs,1), validationRatio, testRatio);
+
+trainingInputs = inputs[trainIndexes,:];
+trainingInputs = convert(Array{Real,2}, trainingInputs);
+trainingTargets = targets[trainIndexes,:];
+trainingTargets = convert(Array{Bool,2}, trainingTargets);
+
+testInputs = inputs[testIndexes,:];
+testInputs = convert(Array{Real,2}, testInputs);
+testTargets = targets[testIndexes,:];
+testTargets = convert(Array{Bool,2}, testTargets);
+
+validationInputs = inputs[validationIndexes,:];
+validationInputs = convert(Array{Real,2}, validationInputs);
+validationTargets = targets[validationIndexes,:];
+validationTargets = convert(Array{Bool,2}, validationTargets);
+
+#Calculamos los valores de los parametros de normalización del conjunto de entranamiento
+normParams = calculateZeroMeanNormalizationParameters(trainingInputs);
+
+#Normalizamos los conjuntos de entrenamiento, validacion y test
+#(si un atributo tiene desviacion tipica = 0 le asignamos 0 como valor constante)
+normalizeZeroMean!(trainingInputs, normParams);
+normalizeZeroMean!(validationInputs, normParams);
+normalizeZeroMean!(testInputs, normParams);
 
 #Creamos y entrenamos la RNA
-(trainedANN, lossTraining, lossValidation, lossTest) = trainClassANN(topology, (inputs, targets), maxEpochs = maxEpochs, learningRate = learningRate);
+(trainedANN, lossTraining, lossValidation, lossTest) = trainClassANN(topology, (trainingInputs, trainingTargets), 
+validationDataset = (validationInputs, validationTargets), testDataset = (testInputs, testTargets),
+maxEpochs = maxEpochs);
 
-#Obtenemos las salidas utilizando la RNA entrenada
-outputs = trainedANN(inputs');
-outputs = outputs';
+#Obtenemos las salidas utilizando la RNA entrenada y calculamos la precisión
 
-#Calculamos la precisión
-accuracySet = accuracy(outputs, targets);
+outputsTrain = trainedANN(trainingInputs');
+outputsTrain = outputsTrain';
+accuracyTrain = accuracy(outputsTrain, trainingTargets);
+
+outputsVal = trainedANN(validationInputs');
+outputsVal = outputsVal';
+accuracyVal = accuracy(outputsVal, validationTargets);
+
+outputsTest = trainedANN(testInputs');
+outputsTest = outputsTest';
+accuracyTest = accuracy(outputsTest, testTargets);
