@@ -179,18 +179,24 @@ function trainClassANN(topology::AbstractArray{<:Int,1},
     maxEpochs::Int=1000, minLoss::Real=0.0, learningRate::Real=0.01, 
     maxEpochsVal::Int=20, showText::Bool=false)
 
-    #Separamos las entradas y salidas deseadas de los conjuntos de entrenamiento, validacion y test
+    #Separamos las entradas y salidas deseadas de los conjuntos de entrenamiento, validacion y test y
+    #comprobamos que hay el mismo número de patrones(filas) en las entradas y en las salidas deseadas
     trainingInputs = trainingDataset[1];
-    trainingTargets = trainingDataset[2];
-    validationInputs = validationDataset[1];
-    validationTargets = validationDataset[2];
-    testInputs = testDataset[1];
-    testTargets = testDataset[2];
-
-    #Comprobamos que hay el mismo número de patrones(filas) en las entradas y en las salidas deseadas
+    trainingTargets = trainingDataset[2]; 
     @assert(size(trainingInputs,1)==size(trainingTargets,1));
-    @assert(size(validationInputs,1)==size(validationTargets,1));
-    @assert(size(testInputs,1)==size(testTargets,1));
+
+    if(validationDataset[1] != Array{eltype(trainingDataset[1]),2}(undef,0,0) && validationDataset[2] != falses(0,0))
+        validationInputs = validationDataset[1];
+        validationTargets = validationDataset[2];
+        @assert(size(validationInputs,1)==size(validationTargets,1));
+    end
+
+    if(testDataset[1] != Array{eltype(trainingDataset[1]),2}(undef,0,0) && testDataset[2] != falses(0,0))
+        testInputs = testDataset[1];
+        testTargets = testDataset[2];
+        @assert(size(testInputs,1)==size(testTargets,1));
+    end
+    
 
     #Creamos la RNA
     ann = buildClassANN(size(trainingInputs,2), topology, size(trainingTargets,2); transferFunctions);
@@ -205,20 +211,27 @@ function trainClassANN(topology::AbstractArray{<:Int,1},
     lossValidation = Float32[];
     lossTest = Float32[];
 
-    #Obtenemos los valores de loss en el ciclo 0 (los pesos son aleatorios)
+    #Obtenemos los valores de loss en el ciclo 0 (los pesos son aleatorios) y los almacenamos
     lossTrainingCurrent = loss(trainingInputs', trainingTargets');
-    lossValidationCurrent = loss(validationInputs', validationTargets');
-    lossTestCurrent = loss(testInputs', testTargets');
-
-    #Almacenamos los valores de loss del ciclo 0
     push!(lossTraining, lossTrainingCurrent);
-    push!(lossValidation, lossValidationCurrent);
-    push!(lossTest, lossTestCurrent);
+
+    if(validationDataset[1] != Array{eltype(trainingDataset[1]),2}(undef,0,0) && validationDataset[2] != falses(0,0))
+        lossValidationCurrent = loss(validationInputs', validationTargets');
+        push!(lossValidation, lossValidationCurrent);
+    end
+
+    if(testDataset[1] != Array{eltype(trainingDataset[1]),2}(undef,0,0) && testDataset[2] != falses(0,0))
+        lossTestCurrent = loss(testInputs', testTargets');
+        push!(lossTest, lossTestCurrent);
+    end
+        
 
     #Ciclo actual, nº de ciclos sin mejorar el loss de validación, mejor error de valoración, mejor RNA
     currentEpoch = 0;
     epochNoUpgradeValidation = 0;
-    bestValidationLoss = lossValidationCurrent;
+    if(validationDataset[1] != Array{eltype(trainingDataset[1]),2}(undef,0,0) && validationDataset[2] != falses(0,0))
+        bestValidationLoss = lossValidationCurrent;
+    end    
     bestANN = deepcopy(ann);
     
     while ((currentEpoch < maxEpochs) && (lossTrainingCurrent > minLoss) && (epochNoUpgradeValidation < maxEpochsVal))
@@ -229,26 +242,38 @@ function trainClassANN(topology::AbstractArray{<:Int,1},
         #Aumentamos el ciclo actual
         currentEpoch += 1;
 
-        #Obtenemos los valores de loss en el ciclo actual
+        #Obtenemos los valores de loss en el ciclo actual y los almacenamos
         lossTrainingCurrent = loss(trainingInputs', trainingTargets');
-        lossValidationCurrent = loss(validationInputs', validationTargets');
-        lossTestCurrent = loss(testInputs', testTargets');
-
-        #Almacenamos los valores de loss del ciclo actual
         push!(lossTraining, lossTrainingCurrent);
-        push!(lossValidation, lossValidationCurrent);
-        push!(lossTest, lossTestCurrent);
 
-        #Si mejoramos el error, guardamos la RNA y ponemos a 0 el nº de ciclos sin mejora (Parada temprana)
-        if(lossValidationCurrent < bestValidationLoss)
-            bestValidationLoss = lossValidationCurrent;
-            epochNoUpgradeValidation = 0;
-            bestANN = deepcopy(ann);
-        else
-            epochNoUpgradeValidation += 1;
-        end        
+        if(validationDataset[1] != Array{eltype(trainingDataset[1]),2}(undef,0,0) && validationDataset[2] != falses(0,0))
+            lossValidationCurrent = loss(validationInputs', validationTargets');
+            push!(lossValidation, lossValidationCurrent);
+
+            #Si mejoramos el error, guardamos la RNA y ponemos a 0 el nº de ciclos sin mejora (Parada temprana)
+            if(lossValidationCurrent < bestValidationLoss)
+                bestValidationLoss = lossValidationCurrent;
+                epochNoUpgradeValidation = 0;
+                bestANN = deepcopy(ann);
+            else
+                epochNoUpgradeValidation += 1;
+            end    
+
+        end  
+
+        if(testDataset[1] != Array{eltype(trainingDataset[1]),2}(undef,0,0) && testDataset[2] != falses(0,0))
+            lossTestCurrent = loss(testInputs', testTargets');
+            push!(lossTest, lossTestCurrent);
+        end          
+            
     end
-    return (ann, lossTraining, lossValidation, lossTest);
+
+    if(validationDataset[1] != Array{eltype(trainingDataset[1]),2}(undef,0,0) && validationDataset[2] != falses(0,0))
+        return (bestANN, lossTraining, lossValidation, lossTest);
+    else
+        return (ann, lossTraining, lossValidation, lossTest);
+    end
+    
 end
 
 
