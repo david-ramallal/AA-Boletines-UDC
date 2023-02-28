@@ -138,7 +138,7 @@ function buildClassANN(numInputs::Int, topology::AbstractArray{<:Int,1}, numOutp
     return ann;
 end
 
-
+#Funcion para dividir el dataset en 2 subconjuntos: entranamiento y test
 function holdOut(N::Int, P::Real)
     #Vector permutado de tamaño N
     randomVector = randperm(N);
@@ -151,7 +151,7 @@ function holdOut(N::Int, P::Real)
     return (trainIndexes, testIndexes);
 end
 
-
+#Funcion para dividir el dataset en 3 subconjuntos: entranamiento, validación y test
 function holdOut(N::Int, Pval::Real, Ptest::Real)
     #Vector permutado de tamaño N
     randomVector = randperm(N);
@@ -179,33 +179,76 @@ function trainClassANN(topology::AbstractArray{<:Int,1},
     maxEpochs::Int=1000, minLoss::Real=0.0, learningRate::Real=0.01, 
     maxEpochsVal::Int=20, showText::Bool=false)
 
+    #Separamos las entradas y salidas deseadas de los conjuntos de entrenamiento, validacion y test
+    trainingInputs = trainingDataset[1];
+    trainingTargets = trainingDataset[2];
+    validationInputs = validationDataset[1];
+    validationTargets = validationDataset[2];
+    testInputs = testDataset[1];
+    testTargets = testDataset[2];
 
-    inputs = trainingDataset[1];
-    outputs = trainingDataset[2];
+    #Comprobamos que hay el mismo número de patrones(filas) en las entradas y en las salidas deseadas
+    @assert(size(trainingInputs,1)==size(trainingTargets,1));
+    @assert(size(validationInputs,1)==size(validationTargets,1));
+    @assert(size(testInputs,1)==size(testTargets,1));
 
-    ann = buildClassANN(size(inputs,2), topology, size(outputs,2); transferFunctions);
+    #Creamos la RNA
+    ann = buildClassANN(size(trainingInputs,2), topology, size(trainingTargets,2); transferFunctions);
 
     #Creamos la funcion "loss" para entrenar la RNA
     #Dependiendo de si hay 2 clases o más de 2 usamos una función u otra
     #El primer argumento son las salidas del modelo y el segundo las salidas deseadas
     loss(x,y) = (size(y,1) == 1) ? Losses.binarycrossentropy(ann(x),y) : Losses.crossentropy(ann(x),y);
 
-    #Vector con los valores de loss en cada ciclo de entrenamiento
-    lossValues = zeros(Float32, maxEpochs)
-    lossValues[1] = loss(inputs',targets');
+    #Vectores con los valores de loss en cada ciclo de entrenamiento
+    lossTraining = Float32[];
+    lossValidation = Float32[];
+    lossTest = Float32[];
 
-    currentEpoch = 1;
+    #Obtenemos los valores de loss en el ciclo 0 (los pesos son aleatorios)
+    lossTrainingCurrent = loss(trainingInputs', trainingTargets');
+    lossValidationCurrent = loss(validationInputs', validationTargets');
+    lossTestCurrent = loss(testInputs', testTargets');
+
+    #Almacenamos los valores de loss del ciclo 0
+    push!(lossTraining, lossTrainingCurrent);
+    push!(lossValidation, lossValidationCurrent);
+    push!(lossTest, lossTestCurrent);
+
+    #Ciclo actual, nº de ciclos sin mejorar el loss de validación, mejor error de valoración, mejor RNA
+    currentEpoch = 0;
+    epochNoUpgradeValidation = 0;
+    bestValidationLoss = lossValidationCurrent;
+    bestANN = deepcopy(ann);
     
-    while ((currentEpoch < maxEpochs) && (lossValues[currentEpoch] > minLoss))
+    while ((currentEpoch < maxEpochs) && (lossTrainingCurrent > minLoss) && (epochNoUpgradeValidation < maxEpochsVal))
 
         #Entrenamos un ciclo la RNA
-        Flux.train!(loss, params(ann), [(inputs', targets')], ADAM(learningRate));
+        Flux.train!(loss, params(ann), [(trainingInputs', trainingTargets')], ADAM(learningRate));
 
-        lossValues[currentEpoch+1] = loss(inputs',targets');
-
+        #Aumentamos el ciclo actual
         currentEpoch += 1;
+
+        #Obtenemos los valores de loss en el ciclo actual
+        lossTrainingCurrent = loss(trainingInputs', trainingTargets');
+        lossValidationCurrent = loss(validationInputs', validationTargets');
+        lossTestCurrent = loss(testInputs', testTargets');
+
+        #Almacenamos los valores de loss del ciclo actual
+        push!(lossTraining, lossTrainingCurrent);
+        push!(lossValidation, lossValidationCurrent);
+        push!(lossTest, lossTestCurrent);
+
+        #Si mejoramos el error, guardamos la RNA y ponemos a 0 el nº de ciclos sin mejora (Parada temprana)
+        if(lossValidationCurrent < bestValidationLoss)
+            bestValidationLoss = lossValidationCurrent;
+            epochNoUpgradeValidation = 0;
+            bestANN = deepcopy(ann);
+        else
+            epochNoUpgradeValidation += 1;
+        end        
     end
-    return (ann, lossValues);
+    return (ann, lossTraining, lossValidation, lossTest);
 end
 
 
@@ -258,7 +301,7 @@ targets = Bool.(targets);
 normalizeZeroMean!(inputs);
 
 #Creamos y entrenamos la RNA
-(trainedANN, lossValues) = trainClassANN(topology, (inputs, targets), maxEpochs = maxEpochs, learningRate = learningRate);
+(trainedANN, lossTraining, lossValidation, lossTest) = trainClassANN(topology, (inputs, targets), maxEpochs = maxEpochs, learningRate = learningRate);
 
 #Obtenemos las salidas utilizando la RNA entrenada
 outputs = trainedANN(inputs');
