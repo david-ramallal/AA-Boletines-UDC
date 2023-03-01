@@ -1,4 +1,4 @@
-using DelimitedFiles, Statistics, Random, Flux, Flux.Losses
+using DelimitedFiles, Statistics, Random, Plots, Flux, Flux.Losses
 using Flux: params
 
 #feature -> vector con los valores de un atributo o salida deseada para cada patron
@@ -303,9 +303,6 @@ testRatio = 0.2;
 #Creamos una topología con una capa oculta de 5 neuronas
 topology = [5];
 
-#Establecemos el número máximo de ciclos a entrenar
-maxEpochs = 1000;
-
 #Cargamos la base de datos.
 dataset = readdlm("Boletines/iris.data",',');
 
@@ -350,8 +347,7 @@ normalizeZeroMean!(testInputs, normParams);
 
 #Creamos y entrenamos la RNA
 (trainedANN, lossTraining, lossValidation, lossTest) = trainClassANN(topology, (trainingInputs, trainingTargets), 
-validationDataset = (validationInputs, validationTargets), testDataset = (testInputs, testTargets),
-maxEpochs = maxEpochs);
+validationDataset = (validationInputs, validationTargets), testDataset = (testInputs, testTargets));
 
 #Obtenemos las salidas utilizando la RNA entrenada y calculamos la precisión
 
@@ -366,3 +362,12 @@ accuracyVal = accuracy(outputsVal, validationTargets);
 outputsTest = trainedANN(testInputs');
 outputsTest = outputsTest';
 accuracyTest = accuracy(outputsTest, testTargets);
+
+#Obtenemos la gráfica de la evolución de loss en entrenamiento, validación y test
+graph = plot(title = "Evolución de los valores de loss", xaxis = "Ciclo", yaxis = "Error");
+plot!(graph, 1:length(lossTraining), lossTraining, label = "Entrenamiento");
+plot!(graph, 1:length(lossValidation), lossValidation, label = "Validación");
+plot!(graph, 1:length(lossTest), lossTest, label = "Test");
+
+#Mostramos la gráfica
+display(graph);
