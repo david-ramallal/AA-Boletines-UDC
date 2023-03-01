@@ -346,8 +346,15 @@ normalizeZeroMean!(validationInputs, normParams);
 normalizeZeroMean!(testInputs, normParams);
 
 #Creamos y entrenamos la RNA
-(trainedANN, lossTraining, lossValidation, lossTest) = trainClassANN(topology, (trainingInputs, trainingTargets), 
-validationDataset = (validationInputs, validationTargets), testDataset = (testInputs, testTargets));
+if(testRatio != 0 && validationRatio != 0)
+    (trainedANN, lossTraining, lossValidation, lossTest) = trainClassANN(topology, (trainingInputs, trainingTargets), 
+    validationDataset = (validationInputs, validationTargets), testDataset = (testInputs, testTargets));
+elseif (testRatio != 0 && validationRatio == 0)
+    (trainedANN, lossTraining, lossValidation, lossTest) = trainClassANN(topology, (trainingInputs, trainingTargets),
+    testDataset = (testInputs, testTargets));
+else 
+    (trainedANN, lossTraining, lossValidation, lossTest) = trainClassANN(topology, (trainingInputs, trainingTargets));
+end
 
 #Obtenemos las salidas utilizando la RNA entrenada y calculamos la precisión
 
@@ -355,19 +362,27 @@ outputsTrain = trainedANN(trainingInputs');
 outputsTrain = outputsTrain';
 accuracyTrain = accuracy(outputsTrain, trainingTargets);
 
-outputsVal = trainedANN(validationInputs');
-outputsVal = outputsVal';
-accuracyVal = accuracy(outputsVal, validationTargets);
+if(validationRatio != 0)
+    outputsVal = trainedANN(validationInputs');
+    outputsVal = outputsVal';
+    accuracyVal = accuracy(outputsVal, validationTargets);
+end
 
-outputsTest = trainedANN(testInputs');
-outputsTest = outputsTest';
-accuracyTest = accuracy(outputsTest, testTargets);
+if(testRatio != 0)
+    outputsTest = trainedANN(testInputs');
+    outputsTest = outputsTest';
+    accuracyTest = accuracy(outputsTest, testTargets);
+end
 
 #Obtenemos la gráfica de la evolución de loss en entrenamiento, validación y test
-graph = plot(title = "Evolución de los valores de loss", xaxis = "Ciclo", yaxis = "Error");
+graph = plot(title = "Evolución de los valores de loss", xaxis = "Epoch", yaxis = "MSE");
 plot!(graph, 1:length(lossTraining), lossTraining, label = "Entrenamiento");
-plot!(graph, 1:length(lossValidation), lossValidation, label = "Validación");
-plot!(graph, 1:length(lossTest), lossTest, label = "Test");
+if(validationRatio != 0)
+    plot!(graph, 1:length(lossValidation), lossValidation, label = "Validación");
+end
+if(testRatio != 0)
+    plot!(graph, 1:length(lossTest), lossTest, label = "Test");
+end
 
 #Mostramos la gráfica
 display(graph);
