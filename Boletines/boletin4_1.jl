@@ -302,10 +302,10 @@ function confusionMatrix(outputs::AbstractArray{Bool,1}, targets::AbstractArray{
     @assert(length(outputs)==length(targets));
 
     #Obtenemos los valores de VP, VN, FP, FN
-    vp = sum(targets .== 1 && outputs .== 1);
-    vn = sum(targets .== 0 && outputs .== 0);
-    fp = sum(targets .== 0 && outputs .== 1);
-    fn = sum(targets .== 1 && outputs .== 0);
+    vp = sum(targets .& outputs);
+    vn = sum(.!targets .& .!outputs);
+    fp = sum(.!targets .& outputs);
+    fn = sum(targets .& .!outputs);
 
 
     #Obtenemos la precisión y la tasa de error utilizando las funciones auxiliares
@@ -327,10 +327,10 @@ function confusionMatrix(outputs::AbstractArray{Bool,1}, targets::AbstractArray{
     conf_matrix[2,2] = vp;
 
     #Tenemos en cuenta varios casos particulares
-    if (vn = length(targets))
+    if (vn == length(targets))
         recall = 1.;
         ppv = 1.;
-    elseif (vp = length(targets))
+    elseif (vp == length(targets))
         specificity = 1.;
         npv = 1.;
     end
@@ -340,17 +340,36 @@ function confusionMatrix(outputs::AbstractArray{Bool,1}, targets::AbstractArray{
     ppv = isnan(ppv) ? 0. : ppv;
     npv = isnan(npv) ? 0. : npv;
 
-    if (recall == 0 && ppv == 0)
-        f1 = 0;
-    end
+    f1 = (recall == ppv == 0.) ? 0. : 2 * (recall * ppv) / (recall + ppv);
 
     return (acc, errorRate, recall, specificity, ppv, npv, f1, conf_matrix);
 
 end
 
 
+function confusionMatrix(outputs::AbstractArray{<:Real,1}, targets::AbstractArray{Bool,1}; threshold::Real=0.5) 
+    confusionMatrix(AbstractArray{Bool,1}(outputs.>=threshold),targets);
+end
 
 
+function printConfusionMatrix(outputs::AbstractArray{Bool,1}, targets::AbstractArray{Bool,1})
+    (acc, errorRate, recall, specificity, ppv, npv, f1, conf_matrix) = confusionMatrix(outputs,targets);
+
+    #Mostramos los datos por pantalla
+    print("Valor de precisión: ", acc, "\n");
+    print("Tasa de fallo: ", errorRate, "\n");
+    print("Sensibilidad: ", recall, "\n");
+    print("Especificidad: ", specificity, "\n");
+    print("Valor predictivo positivo: ", ppv, "\n");
+    print("Valor predictivo negativo: ", npv, "\n");
+    print("F1-Score: ", f1, "\n");
+    print("Matriz de confusión: ", conf_matrix, "\n");
+end
+
+
+function printConfusionMatrix(outputs::AbstractArray{<:Real,1}, targets::AbstractArray{Bool,1}; threshold::Real=0.5)
+    printConfusionMatrix(AbstractArray{Bool,1}(outputs.>=threshold),targets);    
+end
 
 
 
