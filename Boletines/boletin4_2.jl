@@ -372,6 +372,34 @@ function printConfusionMatrix(outputs::AbstractArray{<:Real,1}, targets::Abstrac
 end
 
 
+#Estrategia "Uno contra todos"
+function oneVSall(model, inputs::AbstractArray{<:Real,2}, targets::AbstractArray{Bool,2}) 
+    #Obtenemos el número de clases y de instancias
+    numClasses = size(targets,2);
+    numInstances = length(inputs);
+
+    #Comprobamos que el número de clases sea mayor que 2
+    @assert(numClasses>2);
+
+    #Creamos una matriz bidimensional con tantas filas como patrones y tantas columnas como clases 
+    outputs = Array{Float32,2}(undef, numInstances, numClasses);
+
+    #Realizamos un bucle que itere sobre cada clase. 
+    #Creamos las salidas deseadas a cada clase y se entrena el modelo
+    for numClasses in 1:numClasses
+        newModel = deepcopy(model);
+        fit!(newModel, inputs, targets[:, [numClasses]]);
+        outputs[:,numClasses] .= newModel(inputs);
+    end
+
+    #Tomamos la salida mayor de cada clase, aplicándole antes la funcion softmax
+    outputs = softmax(outputs')';
+    outputs = classifyOutputs(outputs);
+
+    return outputs;
+end
+
+
 
 #Establecemos los ratios de validacion y test
 validationRatio = 0.2;
