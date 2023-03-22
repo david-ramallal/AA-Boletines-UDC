@@ -399,6 +399,86 @@ function oneVSall(model, inputs::AbstractArray{<:Real,2}, targets::AbstractArray
     return outputs;
 end
 
+#Métricas para el caso de tener más de dos clases
+function confusionMatrix(outputs::AbstractArray{Bool,2}, targets::AbstractArray{Bool,2}; weighted::Bool=true) 
+    #Comprobamos que los números de columnas de outputs y targets son iguales y distintos de 2
+    @assert(size(outputs,2) == size(targets,2));
+    numClasses = size(targets,2);
+    @assert(numClasses != 2);
+
+    #Si el nº de columnas es igual a 1 llamamos a la función anterior
+    if(numClasses == 1)
+        return confusionMatrix(outputs[:,1],targets[:,1]);
+    else
+        #Reservamos memoria para los vectores de las métricas, con un valor por clase
+        recall = zeros(numClasses);
+        specificity = zeros(numClasses);
+        ppv = zeros(numClasses);
+        npv = zeros(numClasses);
+        f1 = zeros(numClasses); 
+
+        #Iteramos para cada clase, obteniendo las métricas 
+        patternsEachClass = vec(sum(targets, dims=1));
+        for numClass in 1:numClasses
+            if (patternsEachClass[numClass] != 0)
+                (_, _, recall[numClass], specificity[numClass], ppv[numClass], npv[numClass], f1[numClass], _) = confusionMatrix(outputs[:,numClass], targets[:,numClass]);              
+            end
+        end
+
+        #Reservamos memoria para la matriz de confusión
+        conf_matrix = Array{Int64,2}(undef, numClasses, numClasses);
+
+        #Realizamos un bucle doble para rellenar la matriz de confusión
+        for numClassTarget in 1:numClasses
+            for numClassOutput in 1:numClasses
+                conf_matrix[numClassTarget,numClassOutput] = sum(targets[:,numClassTarget] .& outputs[:,numClassOutput]);
+            end
+        end
+
+        #Tomamos los valores dependiendo de si es macro o weighted
+        if (weighted)
+            weight = patternsEachClass ./ sum(patternsEachClass);
+ 
+            recall = sum(weight .* recall);
+            specificity = sum(weight .* specificity);
+            ppv = sum(weight .* ppv);
+            npv = sum(weight .* npv);
+            f1 = sum(weight .* f1);
+
+        else
+            #Para hacer la media solo usamos las clases que tienen patrones
+            nonZeroClasses = sum(patternsEachClass .> 0);
+
+            recall = sum(recall)/nonZeroClasses;
+            specificity = sum(specificity)/nonZeroClasses;
+            ppv = sum(ppv)/nonZeroClasses;
+            npv = sum(npv)/nonZeroClasses;
+            f1 = sum(f1)/nonZeroClasses;
+
+        end
+        #Calculamos la precisión y la tasa de error
+        acc = accuracy(outputs, targets);
+        errorRate = 1. - acc;
+
+        return(acc, errorRate, recall, specificity, ppv, npv, f1, conf_matrix);
+    end   
+end
+
+
+function confusionMatrix(outputs::AbstractArray{<:Real,2}, targets::AbstractArray{Bool,2}; weighted::Bool=true) 
+    return confusionMatrix(classifyOutputs(outputs), targets, weighted = weighted);
+end
+
+
+function confusionMatrix(outputs::AbstractArray{<:Any,1}, targets::AbstractArray{<:Any,1}; weighted::Bool=true)
+    @assert(all([in(output, unique(targets)) for output in outputs]))
+    confusionMatrix(classifyOutputs(outputs), targets; weighted=weighted);
+end
+
+
+
+
+
 
 
 #Establecemos los ratios de validacion y test
