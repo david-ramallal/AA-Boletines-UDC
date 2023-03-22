@@ -513,6 +513,22 @@ function printConfusionMatrix(outputs::AbstractArray{<:Real,2}, targets::Abstrac
 end
 
 
+
+function crossvalidation(N::Int64, k::Int64) 
+    #Creamos un vector con k elementos ordenados (de 1 a k)
+    kVector = collect(1:k);
+    #Creamos otro vector con repeticiones de este hasta que la longitud sea mayor o igual a N 
+    nVector = repeat(kVector, Int64(ceil(N/k)));
+    #Tomamos los N primeros valores
+    nVector = nVector[1:N];
+    #Desordenamos el vector y lo devolvemos
+    shuffle!(nVector);
+    return nVector;
+end
+
+
+
+
 #Establecemos los ratios de validacion y test
 validationRatio = 0.2;
 testRatio = 0.2;
