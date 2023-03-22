@@ -396,6 +396,7 @@ function oneVSall(model, inputs::AbstractArray{<:Real,2}, targets::AbstractArray
     outputs = softmax(outputs')';
     outputs = classifyOutputs(outputs);
 
+    #CREO QUE ESTA FUNCION ESTA MAL, HAY QUE REVISARLA
     return outputs;
 end
 
@@ -476,9 +477,33 @@ function confusionMatrix(outputs::AbstractArray{<:Any,1}, targets::AbstractArray
 end
 
 
+function printConfusionMatrix(outputs::AbstractArray{Bool,2}, targets::AbstractArray{Bool,2}; weighted::Bool=true)
+    (acc, errorRate, recall, specificity, ppv, npv, f1, conf_matrix) = confusionMatrix(outputs,targets, weighted = weighted);
+
+    #Mostramos los datos por pantalla
+    print("Valor de precisión: ", acc, "\n");
+    print("Tasa de fallo: ", errorRate, "\n");
+    print("Sensibilidad: ", recall, "\n");
+    print("Especificidad: ", specificity, "\n");
+    print("Valor predictivo positivo: ", ppv, "\n");
+    print("Valor predictivo negativo: ", npv, "\n");
+    print("F1-Score: ", f1, "\n");
+
+    #Dibujamos la matriz
+    print("Matriz de confusión: \n");
+    for i in axes(conf_matrix, 1)
+        for j in axes(conf_matrix, 2)
+            print(conf_matrix[i, j], "\t")
+        end
+        println()
+    end    
+    
+end
 
 
-
+function printConfusionMatrix(outputs::AbstractArray{<:Real,2}, targets::AbstractArray{Bool,2}; weighted::Bool=true)
+    printConfusionMatrix(classifyOutputs(outputs), targets; weighted=weighted);
+end
 
 
 #Establecemos los ratios de validacion y test
@@ -568,5 +593,6 @@ if(testRatio != 0)
     plot!(graph, 1:length(lossTest), lossTest, label = "Test");
 end
 
-#Mostramos la gráfica
+#Mostramos la gráfica y las métricas
 display(graph);
+printConfusionMatrix(outputsTest, testTargets);
