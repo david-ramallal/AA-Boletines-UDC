@@ -364,7 +364,14 @@ function printConfusionMatrix(outputs::AbstractArray{Bool,1}, targets::AbstractA
     print("Valor predictivo positivo: ", ppv, "\n");
     print("Valor predictivo negativo: ", npv, "\n");
     print("F1-Score: ", f1, "\n");
-    print("Matriz de confusión: ", conf_matrix, "\n");
+    
+    #Dibujamos la matriz
+    print("Matriz de confusión: \n");
+
+    rows = ["Real Negativo", "Real Positivo"];
+    columns = ["Predicción Negativo", "Predicción Positivo"];
+
+    pretty_table(conf_matrix; header=columns, row_names=rows);
 end
 
 
