@@ -527,6 +527,22 @@ function crossvalidation(N::Int64, k::Int64)
 end
 
 
+function crossvalidation(targets::AbstractArray{Bool,2}, k::Int64) 
+    indexes = Array{Int64,1}(undef, size(targets,1));
+    for i in axes(targets,2)
+        #Comprobamos que haya al menos k patrones de cada clase
+        @assert(sum(targets[:,i]) >= k);
+
+        #indexes[((i-1)*sum(targets[:,i])+1):i*sum(targets[:,i])] = crossvalidation(sum(targets[:,i]),k);
+        indexes[1 .== targets[:,i]] = crossvalidation(sum(targets[:,i]),k);
+    end
+    return indexes;
+end
+
+
+function crossvalidation(targets::AbstractArray{<:Any,1}, k::Int64)
+    return crossvalidation((oneHotEncoding(targets)),k);
+end
 
 
 #Establecemos los ratios de validacion y test
