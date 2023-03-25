@@ -1,4 +1,5 @@
 using DelimitedFiles, Statistics, Random, Plots, Flux, Flux.Losses
+using Random:seed!
 using Flux: params
 using PrettyTables
 
@@ -533,7 +534,6 @@ function crossvalidation(targets::AbstractArray{Bool,2}, k::Int64)
         #Comprobamos que haya al menos k patrones de cada clase
         @assert(sum(targets[:,i]) >= k);
 
-        #indexes[((i-1)*sum(targets[:,i])+1):i*sum(targets[:,i])] = crossvalidation(sum(targets[:,i]),k);
         indexes[1 .== targets[:,i]] = crossvalidation(sum(targets[:,i]),k);
     end
     return indexes;
@@ -545,12 +545,79 @@ function crossvalidation(targets::AbstractArray{<:Any,1}, k::Int64)
 end
 
 
+function trainClassANN(topology::AbstractArray{<:Int,1}, trainingDataset::Tuple{AbstractArray{<:Real,2}, AbstractArray{Bool,2}}, 
+    kFoldIndices:: Array{Int64,1}; transferFunctions::AbstractArray{<:Function,1}=fill(σ, length(topology)), maxEpochs::Int=1000, 
+    minLoss::Real=0.0, learningRate::Real=0.01, numRepetitionsANNTraining::Int=1, validationRatio::Real=0.0, maxEpochsVal::Int=20) 
+
+    #Calculamos el número de folds
+    numfolds = maximum(kFoldIndices);
+
+    #Creamos un vector que almacene los valores de precisión
+    accVector = Array{Float64,1}(undef, numfolds);
+
+    #Obtenemos los inputs y los targets del dataset
+    inputs = trainingDataset[1];
+    targets = reshape(trainingDataset[2], 1);
+
+    #Bucle con k iteraciones (k = numfolds)
+    for i in 1:numfolds
+        #Creamos las matrices de entradas y salidas deseadas de entrenamiento y test
+        trainInputs = inputs[kFoldIndices .!= i,:]
+        testInputs = inputs[kFoldIndices .== i, :]
+        trainTargets = targets[kFoldIndices .!= i,:]
+        testTargets = targets[kFoldIndices .== i,:]
+
+        #El entrenamiento de RNA no es determinístico, por lo que, para cada iteración k de la validación cruzada, 
+        #será necesario entrenar varias RNA y devolver el promedio de los resultados de test
+
+        #Creamos un vector para almacenar la metrica en cada repeticion
+        accPerRep = Array{Float64,1}(undef, numRepetitionsAANTraining);
+        for j in 1:numRepetitionsANNTraining
+            #Comprobamos si vamos a emplear conjunto de validación
+            if (validationRatio > 0)
+                #Dividimos el conjunto de entrenamiento en entrenamiento y validación
+                #Entendemos que el ratio de validacion es sobre el total de patrones, contando los de test
+                (trainIndexes, validationIndexes) = holdOut(size(trainInputs,1), validationRatio*size(trainingInputs,1)/size(inputs,1));
+
+                #Entrenamos la RNA
+                ann, = trainClassANN(topology, (convert(Array{Real,2}, trainInputs[trainIndexes,:]), convert(Array{Bool,2}, trainTargets[trainIndexes,:])), 
+                                    validationDataset = (convert(Array{Real,2}, trainInputs[validationIndexes,:]), convert(Array{Bool,2}, trainTargets[validationIndexes,:])),
+                                    testDataset = (testInputs, testTargets), transferFunctions = transferFunctions,
+                                    maxEpochs = maxEpochs, learningRate = learningRate, minLoss = minLoss, maxEpochsVal = maxEpochsVal);
+            else
+                #Con la "," obtenemos solo el primer valor (la red neuronal)
+                ann, = trainClassANN(topology, (trainInputs, trainTargets), testDataset = (testInputs, testTargets), 
+                                    transferFunctions = transferFunctions, maxEpochs = maxEpochs, 
+                                    learningRate = learningRate, minLoss = minLoss);
+            end
+            #Obtenemos las métricas que queremos y las almacenamos en los vectores correspondientes
+            acc, = confusionMatrix(collect(ann(testInputs')'), testTargets);
+            accPerRep[j] = acc;            
+        end
+        #Almacenamos las métricas que queremos y las mostramos por pantalla
+        accVector[i] = mean(accPerRep);
+        println("Test ACCURACY results for fold ", i, "/", numfolds, ": ", accVector[i]);
+    end
+    #Mostramos por pantalla la media de las métricas deseadas y las devolvemos
+    println("Average test accuracy (", numfolds, " folds): ", mean(accVector), ", std desviation: ", std(accVector));
+    return acc;
+end
+
+
+
+
+#Fijamos la semilla aleatoria para asegurar que los experimentos son repetibles
+seed!(1);
+
 #Establecemos los ratios de validacion y test
 validationRatio = 0.2;
 testRatio = 0.2;
 
 #Creamos una topología con una capa oculta de 5 neuronas
 topology = [5];
+
+#Elegimos el número de folds para la validación cruzada
+numfolds = 10;
 
 #Cargamos la base de datos.
 dataset = readdlm("Boletines/iris.data",',');
@@ -566,23 +633,21 @@ targets = oneHotEncoding(targets);
 
 @assert (size(inputs,1)==size(targets,1)) "Las matrices de entradas y salidas deseadas no tienen el mismo número de filas";
 
+#= #Generamos el vector de indices 
+indexVector = crossvalidation(targets, numfolds);
+ =#
+
 #Dividimos el dataset en entrenamiento, validación y test
 (trainIndexes, validationIndexes, testIndexes) = holdOut(size(inputs,1), validationRatio, testRatio);
 
-trainingInputs = inputs[trainIndexes,:];
-trainingInputs = convert(Array{Real,2}, trainingInputs);
-trainingTargets = targets[trainIndexes,:];
-trainingTargets = convert(Array{Bool,2}, trainingTargets);
+trainingInputs = convert(Array{Real,2}, inputs[trainIndexes,:]);
+trainingTargets = convert(Array{Bool,2}, targets[trainIndexes,:]);
 
-testInputs = inputs[testIndexes,:];
-testInputs = convert(Array{Real,2}, testInputs);
-testTargets = targets[testIndexes,:];
-testTargets = convert(Array{Bool,2}, testTargets);
+testInputs = convert(Array{Real,2}, inputs[testIndexes,:]);
+testTargets = convert(Array{Bool,2}, targets[testIndexes,:]);
 
-validationInputs = inputs[validationIndexes,:];
-validationInputs = convert(Array{Real,2}, validationInputs);
-validationTargets = targets[validationIndexes,:];
-validationTargets = convert(Array{Bool,2}, validationTargets);
+validationInputs = convert(Array{Real,2}, inputs[validationIndexes,:]);
+validationTargets = convert(Array{Bool,2}, targets[validationIndexes,:]);
 
 #Calculamos los valores de los parametros de normalización del conjunto de entranamiento
 normParams = calculateZeroMeanNormalizationParameters(trainingInputs);
