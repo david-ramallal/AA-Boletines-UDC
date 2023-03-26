@@ -577,7 +577,7 @@ function trainClassANN(topology::AbstractArray{<:Int,1}, trainingDataset::Tuple{
         #será necesario entrenar varias RNA y devolver el promedio de los resultados de test
 
         #Creamos un vector para almacenar la metrica en cada repeticion
-        accPerRep = Array{Float64,1}(undef, numRepetitionsAANTraining);
+        accPerRep = Array{Float64,1}(undef, numRepetitionsANNTraining);
         for j in 1:numRepetitionsANNTraining
             #Comprobamos si vamos a emplear conjunto de validación
             if (validationRatio > 0)
@@ -606,36 +606,166 @@ function trainClassANN(topology::AbstractArray{<:Int,1}, trainingDataset::Tuple{
     end
     #Mostramos por pantalla la media de las métricas deseadas y las devolvemos
     println("Average test accuracy (", numfolds, " folds): ", mean(accVector), ", std desviation: ", std(accVector));
-    return acc;
+    return (mean(accVector), std(accVector));
 end
 
 
 function modelCrossValidation(modelType::Symbol, modelHyperparameters::Dict, inputs::AbstractArray{<:Real,2}, 
     targets::AbstractArray{<:Any,1}, crossValidationIndices::Array{Int64,1}) 
 
+    #Obtenemos las clases 
+    classes = unique(targets);
 
+    if (modelType == :ANN)
+        #Hacemos one-hot-encoding en el caso de que vayamos a emplear una RNA
+        targets = oneHotEncoding(targets,classes);
 
+        #Creamos y entrenamos la RNA
+        return trainClassANN(modelHyperparameters["topology"], (inputs,targets), crossValidationIndices, 
+                                    transferFunctions=modelHyperparameters["transferFunctions"], 
+                                    maxEpochs=modelHyperparameters["maxEpochs"], 
+                                    minLoss=modelHyperparameters["minLoss"], 
+                                    learningRate=modelHyperparameters["learningRate"],
+                                    numRepetitionsANNTraining=modelHyperparameters["numRepetitionsANNTraining"],
+                                    validationRatio=modelHyperparameters["validationRatio"],
+                                    maxEpochsVal=modelHyperparameters["maxEpochsVal"]);
 
+    elseif ((modelType == :SVM) || (modelType == :DecisionTree) || (modelType == :kNN))
+        #Calculamos el número de folds
+        numfolds = maximum(crossValidationIndices);
 
+        #Creamos un vector que almacene los valores de precisión
+        accVector = Array{Float64,1}(undef, numfolds);
+
+        #Bucle con k iteraciones (k = numfolds)
+        for i in 1:numfolds
+            #Creamos las matrices de entradas y salidas deseadas de entrenamiento y test
+            trainingInputs = inputs[crossValidationIndices .!= i,:];
+            testInputs = inputs[crossValidationIndices .== i, :];
+            trainingTargets = targets[crossValidationIndices .!= i,:];
+            testTargets = targets[crossValidationIndices .== i,:];
+
+            #Generamos el modelo correspondiente
+            if modelType==:SVM
+                model = SVC(kernel=modelHyperparameters["kernel"],
+                        degree=modelHyperparameters["degreeKernel"],
+                        gamma=modelHyperparameters["gammaKernel"], 
+                        C=modelHyperparameters["C"]);
+            elseif modelType==:DecisionTree
+                model = DecisionTreeClassifier(max_depth=modelHyperparameters["maxDepth"], random_state=1);
+            else
+                model = KNeighborsClassifier(modelHyperparameters["numNeighbors"]);
+            end
+
+            #Entrenamos el modelo correspondiente con el conjunto de entranamiento
+            model = fit!(model, trainingInputs, trainingTargets);
+
+            #Realizamos predicciones con el modelo entrenado
+            testOutputs = predict(model, testInputs);
+            testOutputs=oneHotEncoding(testOutputs)
+            testTargets=oneHotEncoding(testTargets)
+
+            #Calculamos las métricas deseadas
+            acc, = confusionMatrix(testOutputs, testTargets);
+            accVector[i] = acc;
+            println("Test ACCURACY results for fold ", i, "/", numfolds, ": ", accVector[i]);
+        end
+        #Mostramos por pantalla la media de las métricas deseadas y las devolvemos
+        println("Average test accuracy (", numfolds, " folds): ", mean(accVector), ", std desviation: ", std(accVector));
+        return (mean(accVector), std(accVector));
+    end
 end
 
 
-
-
-
+#*******************************************************************************************************************************#
 
 #Fijamos la semilla aleatoria para asegurar que los experimentos son repetibles
 seed!(1);
 
+#Elegimos el número de folds para la validación cruzada
+numfolds = 10;
+
+#Establecemos los ratios de validacion y test
+validationRatio = 0.2;
+testRatio = 0.2;
+
+#Creamos los parámetros de la RNA
+topology = [5];
+maxEpochs = 1000;
+learningRate = 0.01;
+maxEpochsVal = 20;
+numRepetitionsANNTraining = 50;
+minLoss = 0.0;
+
+#Creamos los parámetros del SVM
+kernel = "rbf";
+degreeKernel = 3;
+gammaKernel = 2;
+C = 1;
+
+#Creamos los parametros del Decision Tree
+maxDepth = 4;
+
+#Creamos los parámetros del kNN
+kValue = 3;
+
+#Cargamos la base de datos.
+dataset = readdlm("Boletines/iris.data",',');
+
+#Separamos las entradas y las salidas deseadas.
+inputs = Float32.(dataset[:,1:4]);
+targets = dataset[:,5];        
+
+@assert (size(inputs,1)==size(targets,1)) "Las matrices de entradas y salidas deseadas no tienen el mismo número de filas";
+
+#Calculamos los valores de los parametros de normalización del conjunto de entranamiento
+normParams = calculateZeroMeanNormalizationParameters(trainingInputs);
+
+#Normalizamos las entradas y salidas deseadas
+normalizeZeroMean!(inputs);
+normalizeZeroMean!(targets);
+
+#Generamos el vector de índices
+indexVector = crossvalidation(targets, numfolds);
+
+#Pasamos los parámetros dependientes de la RNA 
+modelHyperparametersANN = Dict();
+modelHyperparametersANN["topology"] = topology;
+modelHyperparametersANN["validationRatio"] = validationRatio;
+modelHyperparametersANN["maxEpochs"] = maxEpochs;
+modelHyperparametersANN["learningRate"] = learningRate;
+modelHyperparametersANN["maxEpochsVal"] = maxEpochsVal;
+modelHyperparametersANN["minLoss"] = minLoss;
+modelHyperparametersANN["numRepetitionsANNTraining"] = numRepetitionsAANTraining;
+
+#Entrenamos la RNA
+modelCrossValidation(:ANN, modelHyperparametersANN, inputs, targets, indexVector);
+
+#Pasamos los parámetros dependientes del SVM
+modelHyperparametersSVM = Dict();
+modelHyperparametersSVM["kernel"] = kernel;
+modelHyperparametersSVM["degreeKernel"] = degreeKernel;
+modelHyperparametersSVM["gammaKernel"] = gammaKernel;
+modelHyperparametersSVM["C"] = C;
+
+#Entrenamos el SVM
+modelCrossValidation(:SVM, modelHyperparametersSVM, inputs, targets, indexVector);
+
+#Entrenamos el Decision Tree 
+modelCrossValidation(:DecisionTree, Dict("maxDepth" => maxDepth), inputs, targets, indexVector);
+
+#Entrenamos el kNN
+modelCrossValidation(:kNN, Dict("numNeighbors" => kValue), inputs, targets, indexVector);
+
+
+#= 
+********************************************************************************************************************************
 #Establecemos los ratios de validacion y test
 validationRatio = 0.2;
 testRatio = 0.2;
 
 #Creamos una topología con una capa oculta de 5 neuronas
 topology = [5];
-
-#Elegimos el número de folds para la validación cruzada
-numfolds = 10;
 
 #Cargamos la base de datos.
 dataset = readdlm("Boletines/iris.data",',');
@@ -651,21 +781,23 @@ targets = oneHotEncoding(targets);
 
 @assert (size(inputs,1)==size(targets,1)) "Las matrices de entradas y salidas deseadas no tienen el mismo número de filas";
 
-#= #Generamos el vector de indices 
-indexVector = crossvalidation(targets, numfolds);
- =#
-
 #Dividimos el dataset en entrenamiento, validación y test
 (trainIndexes, validationIndexes, testIndexes) = holdOut(size(inputs,1), validationRatio, testRatio);
 
-trainingInputs = convert(Array{Real,2}, inputs[trainIndexes,:]);
-trainingTargets = convert(Array{Bool,2}, targets[trainIndexes,:]);
+trainingInputs = inputs[trainIndexes,:];
+trainingInputs = convert(Array{Real,2}, trainingInputs);
+trainingTargets = targets[trainIndexes,:];
+trainingTargets = convert(Array{Bool,2}, trainingTargets);
 
-testInputs = convert(Array{Real,2}, inputs[testIndexes,:]);
-testTargets = convert(Array{Bool,2}, targets[testIndexes,:]);
+testInputs = inputs[testIndexes,:];
+testInputs = convert(Array{Real,2}, testInputs);
+testTargets = targets[testIndexes,:];
+testTargets = convert(Array{Bool,2}, testTargets);
 
-validationInputs = convert(Array{Real,2}, inputs[validationIndexes,:]);
-validationTargets = convert(Array{Bool,2}, targets[validationIndexes,:]);
+validationInputs = inputs[validationIndexes,:];
+validationInputs = convert(Array{Real,2}, validationInputs);
+validationTargets = targets[validationIndexes,:];
+validationTargets = convert(Array{Bool,2}, validationTargets);
 
 #Calculamos los valores de los parametros de normalización del conjunto de entranamiento
 normParams = calculateZeroMeanNormalizationParameters(trainingInputs);
@@ -718,3 +850,4 @@ end
 #Mostramos la gráfica y las métricas
 display(graph);
 printConfusionMatrix(outputsTest, testTargets);
+=#
