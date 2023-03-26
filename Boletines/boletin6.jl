@@ -645,12 +645,12 @@ function modelCrossValidation(modelType::Symbol, modelHyperparameters::Dict, inp
             testTargets = targets[crossValidationIndices .== i,:];
 
             #Generamos el modelo correspondiente
-            if modelType==:SVM
+            if (modelType == :SVM)
                 model = SVC(kernel=modelHyperparameters["kernel"],
                         degree=modelHyperparameters["degreeKernel"],
                         gamma=modelHyperparameters["gammaKernel"], 
                         C=modelHyperparameters["C"]);
-            elseif modelType==:DecisionTree
+            elseif (modelType == :DecisionTree)
                 model = DecisionTreeClassifier(max_depth=modelHyperparameters["maxDepth"], random_state=1);
             else
                 model = KNeighborsClassifier(modelHyperparameters["numNeighbors"]);
@@ -661,16 +661,16 @@ function modelCrossValidation(modelType::Symbol, modelHyperparameters::Dict, inp
 
             #Realizamos predicciones con el modelo entrenado
             testOutputs = predict(model, testInputs);
-            testOutputs=oneHotEncoding(testOutputs);
-            testTargets=oneHotEncoding(testTargets);
+            testOutputs = oneHotEncoding(testOutputs, classes);
+            testTargets = oneHotEncoding(testTargets, classes);
 
             #Calculamos las métricas deseadas
             acc, = confusionMatrix(testOutputs, testTargets);
             accVector[i] = acc;
-            println("Test ACCURACY results for fold ", i, "/", numfolds, ": ", accVector[i]);
+            println(modelType, " Test ACCURACY results for fold ", i, "/", numfolds, ": ", accVector[i]);
         end
         #Mostramos por pantalla la media de las métricas deseadas y las devolvemos
-        println(modelType, "Average test accuracy (", numfolds, " folds): ", mean(accVector), ", std desviation: ", std(accVector));
+        println(modelType, " Average test accuracy (", numfolds, " folds): ", mean(accVector), ", std desviation: ", std(accVector));
         return (mean(accVector), std(accVector));
     end
 end
