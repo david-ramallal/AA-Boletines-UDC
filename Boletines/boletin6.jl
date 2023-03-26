@@ -488,7 +488,8 @@ end
 
 function confusionMatrix(outputs::AbstractArray{<:Any,1}, targets::AbstractArray{<:Any,1}; weighted::Bool=true)
     @assert(all([in(output, unique(targets)) for output in outputs]))
-    confusionMatrix(classifyOutputs(outputs), targets; weighted=weighted);
+    classes = unique(targets);
+    confusionMatrix(oneHotEncoding(outputs, classes), oneHotEncoding(targets, classes); weighted=weighted);
 end
 
 
@@ -661,8 +662,6 @@ function modelCrossValidation(modelType::Symbol, modelHyperparameters::Dict, inp
 
             #Realizamos predicciones con el modelo entrenado
             testOutputs = predict(model, testInputs);
-            testOutputs = oneHotEncoding(testOutputs, classes);
-            testTargets = oneHotEncoding(testTargets, classes);
 
             #Calculamos las métricas deseadas
             acc, = confusionMatrix(testOutputs, testTargets);
