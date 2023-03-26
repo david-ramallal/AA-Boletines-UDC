@@ -563,7 +563,7 @@ function trainClassANN(topology::AbstractArray{<:Int,1}, trainingDataset::Tuple{
 
     #Obtenemos los inputs y los targets del dataset
     inputs = trainingDataset[1];
-    targets = reshape(trainingDataset[2], 1);
+    targets = trainingDataset[2];
 
     #Bucle con k iteraciones (k = numfolds)
     for i in 1:numfolds
@@ -602,10 +602,10 @@ function trainClassANN(topology::AbstractArray{<:Int,1}, trainingDataset::Tuple{
         end
         #Almacenamos las métricas que queremos y las mostramos por pantalla
         accVector[i] = mean(accPerRep);
-        println("Test ACCURACY results for fold ", i, "/", numfolds, ": ", accVector[i]);
+        println("ANN Test ACCURACY results for fold ", i, "/", numfolds, ": ", accVector[i]);
     end
     #Mostramos por pantalla la media de las métricas deseadas y las devolvemos
-    println("Average test accuracy (", numfolds, " folds): ", mean(accVector), ", std desviation: ", std(accVector));
+    println("ANN Average test accuracy (", numfolds, " folds): ", mean(accVector), ", std desviation: ", std(accVector));
     return (mean(accVector), std(accVector));
 end
 
@@ -622,7 +622,6 @@ function modelCrossValidation(modelType::Symbol, modelHyperparameters::Dict, inp
 
         #Creamos y entrenamos la RNA
         return trainClassANN(modelHyperparameters["topology"], (inputs,targets), crossValidationIndices, 
-                                    transferFunctions=modelHyperparameters["transferFunctions"], 
                                     maxEpochs=modelHyperparameters["maxEpochs"], 
                                     minLoss=modelHyperparameters["minLoss"], 
                                     learningRate=modelHyperparameters["learningRate"],
@@ -662,8 +661,8 @@ function modelCrossValidation(modelType::Symbol, modelHyperparameters::Dict, inp
 
             #Realizamos predicciones con el modelo entrenado
             testOutputs = predict(model, testInputs);
-            testOutputs=oneHotEncoding(testOutputs)
-            testTargets=oneHotEncoding(testTargets)
+            testOutputs=oneHotEncoding(testOutputs);
+            testTargets=oneHotEncoding(testTargets);
 
             #Calculamos las métricas deseadas
             acc, = confusionMatrix(testOutputs, testTargets);
@@ -671,7 +670,7 @@ function modelCrossValidation(modelType::Symbol, modelHyperparameters::Dict, inp
             println("Test ACCURACY results for fold ", i, "/", numfolds, ": ", accVector[i]);
         end
         #Mostramos por pantalla la media de las métricas deseadas y las devolvemos
-        println("Average test accuracy (", numfolds, " folds): ", mean(accVector), ", std desviation: ", std(accVector));
+        println(modelType, "Average test accuracy (", numfolds, " folds): ", mean(accVector), ", std desviation: ", std(accVector));
         return (mean(accVector), std(accVector));
     end
 end
@@ -721,9 +720,8 @@ targets = dataset[:,5];
 #Calculamos los valores de los parametros de normalización del conjunto de entranamiento
 normParams = calculateZeroMeanNormalizationParameters(trainingInputs);
 
-#Normalizamos las entradas y salidas deseadas
-normalizeZeroMean!(inputs);
-normalizeZeroMean!(targets);
+#Normalizamos las entradas (¿las salidas deseadas hay que normalizarlas?)
+normalizeZeroMean!(inputs, normParams);
 
 #Generamos el vector de índices
 indexVector = crossvalidation(targets, numfolds);
@@ -736,7 +734,7 @@ modelHyperparametersANN["maxEpochs"] = maxEpochs;
 modelHyperparametersANN["learningRate"] = learningRate;
 modelHyperparametersANN["maxEpochsVal"] = maxEpochsVal;
 modelHyperparametersANN["minLoss"] = minLoss;
-modelHyperparametersANN["numRepetitionsANNTraining"] = numRepetitionsAANTraining;
+modelHyperparametersANN["numRepetitionsANNTraining"] = numRepetitionsANNTraining;
 
 #Entrenamos la RNA
 modelCrossValidation(:ANN, modelHyperparametersANN, inputs, targets, indexVector);
