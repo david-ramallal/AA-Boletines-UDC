@@ -641,8 +641,8 @@ function modelCrossValidation(modelType::Symbol, modelHyperparameters::Dict, inp
             #Creamos las matrices de entradas y salidas deseadas de entrenamiento y test
             trainingInputs = inputs[crossValidationIndices .!= i,:];
             testInputs = inputs[crossValidationIndices .== i, :];
-            trainingTargets = targets[crossValidationIndices .!= i,:];
-            testTargets = targets[crossValidationIndices .== i,:];
+            trainingTargets = targets[crossValidationIndices .!= i];
+            testTargets = targets[crossValidationIndices .== i];
 
             #Generamos el modelo correspondiente
             if (modelType == :SVM)
