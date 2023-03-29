@@ -717,7 +717,7 @@ targets = dataset[:,5];
 @assert (size(inputs,1)==size(targets,1)) "Las matrices de entradas y salidas deseadas no tienen el mismo número de filas";
 
 #Calculamos los valores de los parametros de normalización del conjunto de entranamiento
-normParams = calculateZeroMeanNormalizationParameters(trainingInputs);
+normParams = calculateZeroMeanNormalizationParameters(inputs);
 
 #Normalizamos las entradas (¿las salidas deseadas hay que normalizarlas?)
 normalizeZeroMean!(inputs, normParams);
