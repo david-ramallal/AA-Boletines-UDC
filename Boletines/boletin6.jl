@@ -584,7 +584,7 @@ function trainClassANN(topology::AbstractArray{<:Int,1}, trainingDataset::Tuple{
             if (validationRatio > 0)
                 #Dividimos el conjunto de entrenamiento en entrenamiento y validación
                 #Entendemos que el ratio de validacion es sobre el total de patrones, contando los de test
-                (trainIndexes, validationIndexes) = holdOut(size(trainInputs,1), validationRatio*size(trainingInputs,1)/size(inputs,1));
+                (trainIndexes, validationIndexes) = holdOut(size(trainInputs,1), validationRatio*size(trainInputs,1)/size(inputs,1));
 
                 #Entrenamos la RNA
                 ann, = trainClassANN(topology, (convert(Array{Real,2}, trainInputs[trainIndexes,:]), convert(Array{Bool,2}, trainTargets[trainIndexes,:])), 
